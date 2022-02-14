@@ -27,7 +27,8 @@ environment before installing the requirement): \
 `pip install -r requirement.yml`
 
 **Attention:** About *underthesea* package, you have to install
-it by *pip* (thanks for the creating underthesea team :heart_eyes:): \
+it by *pip* (thanks for the creating [underthesea](https://underthesea.readthedocs.io/en/latest/)
+team :heart_eyes:): \
 `pip instal underthesea`
 
 ## 2. 
