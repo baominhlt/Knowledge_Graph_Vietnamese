@@ -29,6 +29,6 @@ environment before installing the requirement): \
 **Attention:** About *underthesea* package, you have to install
 it by *pip* (thanks for the creating [underthesea](https://underthesea.readthedocs.io/en/latest/)
 team :heart_eyes:): \
-`pip instal underthesea`
+`pip install underthesea`
 
 ## 2. 
