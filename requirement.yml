@@ -1,0 +1,6 @@
+# create nlp conda env
+jupyter
+pandas
+matplotlib
+transformers
+# underthesea
