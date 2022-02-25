@@ -1,4 +1,5 @@
 from underthesea import pos_tag as pos
+from underthesea import word_tokenize as tokenizer
 import pandas as pd
 import timeit
 
@@ -11,34 +12,56 @@ def read_content(filepath):
     f.close()
     return content
 
+# Preprocessing the text
+def preprocessing(has_accents_content):
+    content = []
+    for text in has_accents_content:
+        text = text.replace('vn','VN').replace('cs','CS').replace('nsut','NSUT').replace('gt','GT')
+        text = text.replace('\n','').replace('@','').strip()
+        content.append(text)
+    return content
+
 # Search the entities in a relation
 def search_entities(pos_t, i):
     ent1 = ""
     ent2 = ""
-    if (i + 3 > len(pos_t)):
+    relation = pos_t[i][0]
+    k = i
+    if (i == len(pos_t)-1):
+        return None, None
+    while (pos_t[i+1][1] == "V"):
+        i += 1
+        relation += ' ' + pos_t[i][0]
+        if (i == len(pos_t)-1):
+            return None, None
+    if (i+3 > len(pos_t)):
         m = len(pos_t)
     else:
         m = i + 3
-    for j in range(i + 1, m):
-        if (pos_t[j][1] == "N" or pos_t[j][1] == "Np"):
-            ent2 += pos_t[j][0] + " "
+    j = i+1
+    while (j < m):
+        if (pos_t[j][1] == "N" or pos_t[j][1] == "Np" or pos_t[j][1] == "M"):
+          ent2 += pos_t[j][0] + " "
         else:
-            break
-    if (i == 0):
+          break
+        j += 1
+    t = k-1
+    if (k == 0):
         ent1 = ""
     else:
-        if (pos_t[i - 1][1] == "P" or pos_t[i - 1][1] == "N" or pos_t[i - 1][1] == "Np"):
-            ent1 = pos_t[i - 1][0]
-    if (ent1 and ent2):
-        return [ent1, pos_t[i][0], ent2.strip()]
+        while (pos_t[k-1][1] == "P" or pos_t[k-1][1] == "N" or pos_t[k-1][1] == "Np"):
+            ent1 = pos_t[k-1][0] + ' ' + ent1
+            k -= 1
+    if (ent1 and ent2 and (ent1.strip() != ent2.strip())):
+        return [ent1.strip(), relation, ent2.strip()], [k,t,i+1,j-1]
     else:
-        return None
+        return None, None
 
 # Extract the relation in a text from file's text
-def extract_relation(content, relation_v, relation_c, debug = True):
+def extract_relation(content, debug = True):
     kg = []
-    count = -1
-
+    index = []
+    count = 0
     if (debug):
         n_loop = 500
     else:
@@ -47,30 +70,38 @@ def extract_relation(content, relation_v, relation_c, debug = True):
         count += 1
         pos_t = list(pos(text))
         check = False
+        id = False
         for i in range(len(pos_t)):
-            if (pos_t[i][1] == "V" and pos_t[i][0] in relation_v):
-                check = search_entities(pos_t, i)
-            if (pos_t[i][1] == "C" and pos_t[i][0] in relation_c):
-                check = search_entities(pos_t, i)
-        if (check):
-            kg.append([count, check])
-
-    return kg
+            if (pos_t[i][1] == "V"):
+                check, id = search_entities(pos_t, i)
+            if (check):
+                t = ['', '', '']
+                if (len(kg) != 0):
+                    t = kg[-1]
+                if (check[1] not in t[1]):
+                    kg.append(check)
+                    index.append([count, id])
+                check = False
+    return kg, index
 
 # Create content of target dataset
-def create_content(kg, content):
+def create_content(content, index):
     target_content = []
-    id = -1
-
-    for item in kg:
-        id += 1
+    count = -1
+    for item in index:
+        count += 1
         dic = {}
-        dic['id'] = id
-        text = content[item[0]]
-        text = text.replace(item[1][0], '<< ' + item[1][0] + ' >>', 1).replace(item[1][2], '[[ ' + item[1][2] + ' ]]',1)
-        dic['text'] = text
+        text = tokenizer(content[item[0]])
+        text.insert(item[1][3] + 1, "]]")
+        text.insert(item[1][2], "[[")
+        text.insert(item[1][1] + 1, ">>")
+        if (item[1][0] == -1):
+            text.insert(0, "<<")
+        else:
+            text.insert(item[1][0], "<<")
+        dic['text'] = ' '.join(text)
+        dic['id'] = count
         target_content.append(dic)
-
     return target_content
 
 # Print the runtime by hours:minutes:seconds
@@ -85,18 +116,14 @@ def print_runtime(text, start, stop):
 #---------------------------------------------------------------------------------------------------------------------
 start = timeit.default_timer()
 
-# Initialize the relation
-relation_v = "nói nghe là"
-relation_c = "và hoặc"
-
 # Read file's content
 has_accents_content = read_content('file path + file name')
 
-# Normalize many rules in Vietnamese
-content = []
-for text in has_accents_content:
-  text = text.replace('vn','VN').replace('cs','CS').replace('nsut','NSUT').replace('gt','GT')
-  content.append(text)
+# Preprocessing
+start = timeit.default_timer()
+content = preprocessing(has_accents_content)
+stop = timeit.default_timer()
+print_runtime('Preprocessing runtime: ', start, stop)
 
 '''
 If you just wanna test the program whether it can run good or not:
@@ -104,16 +131,18 @@ If you just wanna test the program whether it can run good or not:
 - If no: set the debug is False
 '''
 start_kg = timeit.default_timer()
-kg = extract_relation(content, relation_v, relation_c, debug = True)
+kg, index = extract_relation(content, debug = True)
 stop_kg = timeit.default_timer()
 print_runtime('Extract relation runtime: ', start_kg, stop_kg)
 
-target_content = create_content(kg, content)
+target_content = create_content(content, index)
 stop = timeit.default_timer()
 print_runtime('Full runtime: ', start, stop)
 
 # Export the target dataset to csv file
-df = pd.DataFrame(target_content)
-df.to_csv('output_file_name')
+with open('output_filename', 'w') as f:
+    f.write('[entity 1, relation, entity 2]\n')
+    for item in kg:
+        f.write(str(item)+'\n')
 
 # THE END
