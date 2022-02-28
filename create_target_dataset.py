@@ -139,7 +139,7 @@ target_content = create_content(content, index)
 stop = timeit.default_timer()
 print_runtime('Full runtime: ', start, stop)
 
-# Export the target dataset to csv file
+# Export the knowledge graph to txt file
 with open('output_filename', 'w') as f:
     f.write('[entity 1, relation, entity 2]\n')
     for item in kg:
